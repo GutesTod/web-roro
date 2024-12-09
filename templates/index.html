@@ -10,6 +10,11 @@
     <div class="container">
         <h1>Загрузите изображение</h1>
         <form id="uploadForm" enctype="multipart/form-data">
+            <label for="modelSelect">Выберите модель:</label>
+            <select id="modelSelect" name="model">
+                <option value="yolo11n" selected>yolo11n</option>
+                <option value="yolov5n">yolov5n</option>
+            </select>
             <input type="file" id="fileInput" name="file" accept="image/jpeg,image/png" required>
             <button type="submit">Загрузить</button>
         </form>
@@ -29,9 +34,15 @@
         document.getElementById('uploadForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const fileInput = document.getElementById('fileInput');
+            console.log(fileInput)
             const file = fileInput.files[0];
+            console.log(file)
+            const modelSelect = document.getElementById('modelSelect');
+            const model = modelSelect.value;
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('model', model);
+            console.log(formData)
 
             // Show status message and loader
             document.getElementById('statusContainer').style.display = 'block';
@@ -42,6 +53,8 @@
                     method: 'POST',
                     body: formData
                 });
+
+                console.log(response)
 
                 if (response.ok) {
                     const blob = await response.blob();

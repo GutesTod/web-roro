@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import StreamingResponse, HTMLResponse
 from ultralytics import YOLO
 import numpy as np
@@ -6,23 +6,40 @@ import io
 from PIL import Image, ImageDraw
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 app = FastAPI()
 
-# Загрузите вашу модель YOLO
-model = YOLO("yolo11n.pt")  # Замените на путь к вашей модели
+# Load models
+model_yolo11n = YOLO("yolo11n.pt")
+model_yolov5n = YOLO("yolov5n.pt")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+class UploadData(BaseModel):
+    model: str
+    file: UploadFile
 
 @app.get("/", response_class=HTMLResponse)
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload/")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(data: UploadData = Form(...)):
+    file = data.file
+    model_name = data.model
+
     if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+        raise HTTPException(status_code=400, detail="Неверный тип файла")
+
+    # Выберите соответствующую модель
+    if model_name == "yolo11n":
+        model = model_yolo11n
+    elif model_name == "yolov5n":
+        model = model_yolov5n
+    else:
+        raise HTTPException(status_code=400, detail="Неверный выбор модели")
 
     # Чтение изображения
     image = Image.open(file.file)
@@ -50,4 +67,4 @@ async def upload_image(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
