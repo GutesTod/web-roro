@@ -6,6 +6,7 @@ import io
 from PIL import Image, ImageDraw
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -16,22 +17,29 @@ model_yolo11m = YOLO("yolo11m.pt")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+class UploadData(BaseModel):
+    model: str
+    file: UploadFile
+
 @app.get("/", response_class=HTMLResponse)
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload/")
-async def upload_image(file: UploadFile = File(...), model_name: str = Form(...)):
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+async def upload_image(data: UploadData = Form(...)):
+    file = data.file
+    model_name = data.model
 
-    # Select the appropriate model
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Неверный тип файла")
+
+    # Выберите соответствующую модель
     if model_name == "yolo11n":
         model = model_yolo11n
     elif model_name == "yolo11m":
         model = model_yolo11m
     else:
-        raise HTTPException(status_code=400, detail="Invalid model selection")
+        raise HTTPException(status_code=400, detail="Неверный выбор модели")
 
     # Чтение изображения
     image = Image.open(file.file)
