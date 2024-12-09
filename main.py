@@ -12,7 +12,7 @@ app = FastAPI()
 
 # Load models
 model_yolo11n = YOLO("yolo11n.pt")
-model_yolo11m = YOLO("yolo11m.pt")
+model_yolov5n = YOLO("yolov5n.pt")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -36,8 +36,8 @@ async def upload_image(data: UploadData = Form(...)):
     # Выберите соответствующую модель
     if model_name == "yolo11n":
         model = model_yolo11n
-    elif model_name == "yolo11m":
-        model = model_yolo11m
+    elif model_name == "yolov5n":
+        model = model_yolov5n
     else:
         raise HTTPException(status_code=400, detail="Неверный выбор модели")
 
