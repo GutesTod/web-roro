@@ -10,6 +10,11 @@
     <div class="container">
         <h1>Загрузите изображение</h1>
         <form id="uploadForm" enctype="multipart/form-data">
+            <label for="modelSelect">Выберите модель:</label>
+            <select id="modelSelect" name="model">
+                <option value="yolo11n" selected>yolo11n</option>
+                <option value="yolo11m">yolo11m</option>
+            </select>
             <input type="file" id="fileInput" name="file" accept="image/jpeg,image/png" required>
             <button type="submit">Загрузить</button>
         </form>
@@ -30,8 +35,11 @@
             event.preventDefault();
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
+            const modelSelect = document.getElementById('modelSelect');
+            const model = modelSelect.value;
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('model', model);
 
             // Show status message and loader
             document.getElementById('statusContainer').style.display = 'block';

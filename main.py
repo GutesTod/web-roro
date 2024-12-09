@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import StreamingResponse, HTMLResponse
 from ultralytics import YOLO
 import numpy as np
@@ -9,8 +9,9 @@ from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
 
-# Загрузите вашу модель YOLO
-model = YOLO("yolo11n.pt")  # Замените на путь к вашей модели
+# Load models
+model_yolo11n = YOLO("yolo11n.pt")
+model_yolo11m = YOLO("yolo11m.pt")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -20,9 +21,17 @@ async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload/")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(file: UploadFile = File(...), model_name: str = Form(...)):
     if file.content_type not in ["image/jpeg", "image/png"]:
         raise HTTPException(status_code=400, detail="Invalid file type")
+
+    # Select the appropriate model
+    if model_name == "yolo11n":
+        model = model_yolo11n
+    elif model_name == "yolo11m":
+        model = model_yolo11m
+    else:
+        raise HTTPException(status_code=400, detail="Invalid model selection")
 
     # Чтение изображения
     image = Image.open(file.file)
@@ -50,4 +59,4 @@ async def upload_image(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
