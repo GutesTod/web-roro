@@ -133,13 +133,9 @@ async def process_video(file_path, model):
                 x1, y1, x2, y2 = map(int, box[:4])
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 has_objects = True
-        if has_objects:
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_base64 = base64.b64encode(buffer).decode('utf-8')
-            await manager.broadcast(frame_base64)
 
         current_time = time.time()
-        if current_time - start_time >= 30:
+        if current_time - start_time >= 15 and has_objects:
             _, buffer = cv2.imencode('.jpg', frame)
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
             await manager.broadcast(frame_base64)
