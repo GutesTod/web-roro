@@ -5,17 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Обнаружение людей</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        .result-image-container img {
+            max-width: 100%;
+            height: auto;
+        }
+        #frames img {
+            max-width: 200px; /* Уменьшаем размер кадров */
+            height: auto;
+            margin: 5px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Загрузите изображение</h1>
+        <h1>Загрузите файл</h1>
         <form id="uploadForm" enctype="multipart/form-data">
             <label for="modelSelect">Выберите модель:</label>
             <select id="modelSelect" name="model">
                 <option value="yolo11n" selected>yolo11n</option>
                 <option value="yolov5n">yolov5n</option>
             </select>
-            <input type="file" id="fileInput" name="file" accept="image/jpeg,image/png" required>
+            <input type="file" id="fileInput" name="file" accept="image/jpeg,image/png,video/mp4,video/avi" required>
             <button type="submit">Загрузить</button>
         </form>
         <div id="statusContainer" style="display: none;">
@@ -25,58 +54,162 @@
         <div id="resultContainer" style="display: none;">
             <h2>Результат</h2>
             <div class="result-image-container">
-                <img id="resultImage" src="" alt="Результат">
+                <img id="resultImage" src="" alt="Результат" style="display: none;">
             </div>
-            <button id="uploadNextButton">Загрузить следующее фото</button>
+            <div id="framesContainer" style="display: none;">
+                <h3>Кадры с обнаруженными объектами:</h3>
+                <div id="frames"></div>
+            </div>
+            <button id="uploadNextButton">Загрузить следующий файл</button>
+            <button id="downloadButton" style="display: none;">Скачать видео</button>
         </div>
     </div>
     <script>
+        const socket = new WebSocket(`ws://${window.location.host}/ws/1`);
+
+        socket.addEventListener('open', function(event) {
+            console.log("WebSocket is open now.");
+        });
+
+        socket.addEventListener('message', function(event) {
+            if (event.data === "processing_complete") {
+                // Скрываем статус обработки после завершения обработки видео
+                document.getElementById('statusContainer').style.display = 'none';
+            } else {
+                const frame_base64 = event.data;
+                const img = document.createElement('img');
+                img.src = `data:image/jpeg;base64,${frame_base64}`;
+                img.alt = 'Frame';
+                document.getElementById('frames').appendChild(img);
+            }
+        });
+
+        socket.addEventListener('close', function(event) {
+            // Скрываем статус обработки после завершения обработки видео
+            document.getElementById('statusContainer').style.display = 'none';
+        });
+
         document.getElementById('uploadForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const fileInput = document.getElementById('fileInput');
-            console.log(fileInput)
             const file = fileInput.files[0];
-            console.log(file)
             const modelSelect = document.getElementById('modelSelect');
             const model = modelSelect.value;
             const formData = new FormData();
             formData.append('file', file);
             formData.append('model', model);
-            console.log(formData)
 
             // Show status message and loader
             document.getElementById('statusContainer').style.display = 'block';
             document.getElementById('statusMessage').textContent = 'Обработка...';
 
+            // Show frames container
+            document.getElementById('framesContainer').style.display = 'block';
+            document.getElementById('frames').innerHTML = ''; // Clear previous frames
+
             try {
-                const response = await fetch('/upload/', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                console.log(response)
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    document.getElementById('resultImage').src = url;
-                    document.getElementById('resultContainer').style.display = 'block';
-                    document.getElementById('statusContainer').style.display = 'none';
+                let response;
+                if (file.type.startsWith('image/')) {
+                    response = await fetch('/upload/image', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = URL.createObjectURL(blob);
+                        document.getElementById('resultImage').src = url;
+                        document.getElementById('resultImage').style.display = 'block';
+                        document.getElementById('framesContainer').style.display = 'none';
+                        document.getElementById('downloadButton').style.display = 'none';
+                        document.getElementById('resultContainer').style.display = 'block';
+                    } else {
+                        alert('Failed to upload image');
+                    }
+                } else if (file.type.startsWith('video/')) {
+                    await uploadVideo(file, model);
                 } else {
-                    alert('Failed to upload image');
-                    document.getElementById('statusContainer').style.display = 'none';
+                    alert('Неподдерживаемый тип файла');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred while uploading the image');
-                document.getElementById('statusContainer').style.display = 'none';
+                alert('An error occurred while uploading the file');
             }
         });
 
         document.getElementById('uploadNextButton').addEventListener('click', function() {
             document.getElementById('fileInput').value = '';
             document.getElementById('resultContainer').style.display = 'none';
+            document.getElementById('resultImage').style.display = 'none';
+            document.getElementById('framesContainer').style.display = 'none';
+            document.getElementById('downloadButton').style.display = 'none';
         });
+
+        document.getElementById('downloadButton').addEventListener('click', async function() {
+            const filename = this.getAttribute('data-filename');
+            await downloadVideo(filename);
+        });
+
+        async function uploadVideo(file, model) {
+            console.log("Файл выбран:");
+            if (!file) return;
+
+            document.getElementById('statusContainer').style.display = 'block';
+            document.getElementById('statusMessage').textContent = 'Обработка...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('model', model);
+
+            try {
+                const response = await fetch('/upload/video', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                const filename = data.filename;
+                document.getElementById('framesContainer').style.display = 'block';
+                document.getElementById('downloadButton').style.display = 'block';
+                document.getElementById('downloadButton').setAttribute('data-filename', filename);
+                document.getElementById('resultContainer').style.display = 'block';
+            } catch (error) {
+                console.error('Ошибка при загрузке видео:', error);
+                alert('Failed to upload video');
+            }
+        }
+
+        async function downloadVideo(filename) {
+            try {
+                // Отправляем POST запрос для скачивания видео
+                const response = await fetch('/download/video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: "processed_" + filename })
+                });
+
+                // Создаем URL для скачивания файла
+                const url = window.URL.createObjectURL(await response.blob());
+
+                // Создаем временную ссылку для скачивания
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', filename); // Имя файла, под которым он будет сохранен
+                document.body.appendChild(link);
+
+                // Имитируем клик по ссылке для начала скачивания
+                link.click();
+
+                // Удаляем ссылку из DOM после скачивания
+                document.body.removeChild(link);
+
+                // Освобождаем URL объект
+                window.URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error("Ошибка при скачивании файла:", error);
+            }
+        }
     </script>
 </body>
 </html>

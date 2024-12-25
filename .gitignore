@@ -1,4 +1,6 @@
 .env
+processed/
+uploads/
 .venv
 env/
 venv/
