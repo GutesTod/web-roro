@@ -146,6 +146,7 @@ async def process_video(file_path, model):
 
     cap.release()
     out.release()
+    await manager.broadcast("processing_complete")
 
 def delete_file(file_path: str):
     if os.path.exists(file_path):

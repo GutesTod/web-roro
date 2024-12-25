@@ -72,11 +72,21 @@
         });
 
         socket.addEventListener('message', function(event) {
-            const frame_base64 = event.data;
-            const img = document.createElement('img');
-            img.src = `data:image/jpeg;base64,${frame_base64}`;
-            img.alt = 'Frame';
-            document.getElementById('frames').appendChild(img);
+            if (event.data === "processing_complete") {
+                // Скрываем статус обработки после завершения обработки видео
+                document.getElementById('statusContainer').style.display = 'none';
+            } else {
+                const frame_base64 = event.data;
+                const img = document.createElement('img');
+                img.src = `data:image/jpeg;base64,${frame_base64}`;
+                img.alt = 'Frame';
+                document.getElementById('frames').appendChild(img);
+            }
+        });
+
+        socket.addEventListener('close', function(event) {
+            // Скрываем статус обработки после завершения обработки видео
+            document.getElementById('statusContainer').style.display = 'none';
         });
 
         document.getElementById('uploadForm').addEventListener('submit', async function(event) {
@@ -123,8 +133,6 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('An error occurred while uploading the file');
-            } finally {
-                document.getElementById('statusContainer').style.display = 'none';
             }
         });
 
@@ -166,8 +174,6 @@
             } catch (error) {
                 console.error('Ошибка при загрузке видео:', error);
                 alert('Failed to upload video');
-            } finally {
-                document.getElementById('statusContainer').style.display = 'none';
             }
         }
 
